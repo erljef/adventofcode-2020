@@ -15,15 +15,26 @@ defmodule Day8 do
     |> Map.new
   end
 
+  def find_op(program) do
+    program.program
+    |> Enum.filter(fn {_, {op, _}} -> op != :acc end)
+    |> Enum.map(fn {ix, _} -> Program.switch_op(program, ix) end)
+    |> Enum.map(&Program.execute/1)
+    |> Enum.find(&(&1.terminated))
+  end
+
   def solution do
     IO.puts("#{from_file("day8_input.txt") |> parse |> Program.new |> Program.execute |> Map.get(:acc)}")
+    IO.puts("#{from_file("day8_input.txt") |> parse |> Program.new |> find_op |> Map.get(:acc)}")
   end
 
   defmodule Program do
     defstruct acc: 0,
               history: MapSet.new,
               pc: 0,
-              program: %{}
+              program: %{},
+              infinite: false,
+              terminated: false
 
     def new(%{} = input) do
       %Program{program: input}
@@ -40,7 +51,10 @@ defmodule Day8 do
     def execute(%Program{} = state) do
       cond do
         state.pc in state.history ->
-          state
+          %{state | infinite: true}
+
+        !Map.has_key?(state.program, state.pc) ->
+          %{state | terminated: true}
 
         op = Map.get(state.program, state.pc) ->
           execute(state, op)
@@ -63,6 +77,11 @@ defmodule Day8 do
       state
       |> increase_pc(1)
     end
+
+    def switch_op(state, index), do: state |> switch_op(index, Map.get(state.program, index))
+    def switch_op(state, index, {"jmp", arg}), do: %{state | program: state.program |> Map.replace(index, {"nop", arg})}
+    def switch_op(state, index, {"nop", arg}), do: %{state | program: state.program |> Map.replace(index, {"jmp", arg})}
+    def switch_op(state, _, _), do: state
 
   end
 end
